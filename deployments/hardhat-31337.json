@@ -1,0 +1,13 @@
+{
+  "network": "hardhat",
+  "chainId": 31337,
+  "contractAddress": "0x1629161cc7bdd3f51428cfe1bc1b8cb54fdaddfd",
+  "deployer": "0x4d6e685750fc78647b60589bee395d12b154b900",
+  "tokenName": "Moxi AI",
+  "tokenSymbol": "MOXI",
+  "initialSupply": "1000000000000000000000000000",
+  "rewardRate": "1000000000",
+  "minimumStakeAmount": "1000000000000000000000",
+  "stakingLockPeriod": "604800",
+  "deployedAt": "2025-11-12T05:31:24.733Z"
+}

@@ -1,0 +1,45 @@
+{
+  "name": "depin-coin",
+  "version": "1.0.0",
+  "description": "DePIN (Decentralized Physical Infrastructure Network) token on Ethereum L3",
+  "main": "index.js",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:local": "hardhat run scripts/deploy.ts --network localhost",
+    "deploy:arbitrum": "hardhat run scripts/deploy.ts --network arbitrum",
+    "deploy:optimism": "hardhat run scripts/deploy.ts --network optimism",
+    "deploy:base": "hardhat run scripts/deploy.ts --network base",
+    "node": "hardhat node",
+    "verify": "hardhat run scripts/verify.ts",
+    "interact": "hardhat run scripts/interact.ts",
+    "distribute": "hardhat run scripts/distribute.ts"
+  },
+  "keywords": [
+    "depin",
+    "ethereum",
+    "layer3",
+    "crypto",
+    "token",
+    "defi"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "@nomicfoundation/hardhat-verify": "^2.0.0",
+    "@typechain/ethers-v6": "^0.5.1",
+    "@typechain/hardhat": "^9.1.0",
+    "hardhat": "^2.19.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.1",
+    "dotenv": "^16.3.1",
+    "ethers": "^6.9.0",
+    "systeminformation": "^5.21.20",
+    "axios": "^1.6.2"
+  }
+}
+
