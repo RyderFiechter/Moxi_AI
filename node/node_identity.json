@@ -1,0 +1,10 @@
+{
+  "wallet_address": "0x4d6e685750fc78647b60589bee395d12b154b900",
+  "payment_wallet": "0x4d6e685750fc78647b60589bee395d12b154b900",
+  "storage_lending_enabled": true,
+  "committed_storage_gb": 0.0,
+  "total_profit_eth": 0.0,
+  "profit_start_time": null,
+  "created_at": "2025-11-15T13:01:46.250535",
+  "storage_mount_path": "/"
+}

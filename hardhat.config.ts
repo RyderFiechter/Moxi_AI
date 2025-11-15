@@ -18,6 +18,13 @@ const config: HardhatUserConfig = {
   networks: {
     hardhat: {
       chainId: 31337,
+      // Use your wallet from .env if available, otherwise use default test accounts
+      accounts: process.env.PRIVATE_KEY ? [
+        {
+          privateKey: process.env.PRIVATE_KEY,
+          balance: "10000000000000000000000" // 10000 ETH
+        }
+      ] : undefined, // undefined = use Hardhat's default test accounts
     },
     localhost: {
       url: "http://127.0.0.1:8545",

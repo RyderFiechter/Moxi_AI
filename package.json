@@ -12,7 +12,7 @@
     "deploy:base": "hardhat run scripts/deploy.ts --network base",
     "node": "hardhat node",
     "verify": "hardhat run scripts/verify.ts",
-    "interact": "hardhat run scripts/interact.ts",
+    "interact": "hardhat run scripts/interact.ts --network arbitrum-sepolia",
     "distribute": "hardhat run scripts/distribute.ts"
   },
   "keywords": [

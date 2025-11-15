@@ -1,7 +1,7 @@
 {
   "network": "arbitrum-sepolia",
   "chainId": 421614,
-  "contractAddress": "0x1629161cc7bdd3f51428cfe1bc1b8cb54fdaddfd",
+  "contractAddress": "0xB6d8a31e262d30A1D74804d68B6880224975Fd5C",
   "deployer": "0x4d6e685750fC78647b60589bee395D12b154B900",
   "tokenName": "Moxi AI",
   "tokenSymbol": "MOXI",
@@ -9,5 +9,5 @@
   "rewardRate": "1000000000",
   "minimumStakeAmount": "1000000000000000000000",
   "stakingLockPeriod": "604800",
-  "deployedAt": "2025-11-12T01:49:47.818Z"
+  "deployedAt": "2025-11-13T15:22:08.912Z"
 }
