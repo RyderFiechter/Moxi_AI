@@ -11,6 +11,9 @@ from typing import Optional, Dict, Any
 import secrets
 import psutil
 
+MOXI_PER_SECOND_PER_10_GB = 1.0
+MOXI_PER_SECOND_PER_GB = MOXI_PER_SECOND_PER_10_GB / 10.0
+
 
 class Node:
     """Represents a storage provider node in the network."""
@@ -51,9 +54,12 @@ class Node:
         # Track committed storage (storage registered on-chain, no longer available)
         self.committed_storage_gb: float = 0.0
         
-        # Track profits/rewards earned from storage lending
-        self.total_profit_eth: float = 0.0
-        self.profit_start_time: Optional[datetime] = None
+        # Track MOXI payouts
+        self.total_earned_moxi: float = 0.0
+        self.earnings_balance_moxi: float = 0.0
+        self.earnings_start_time: Optional[datetime] = None
+        self.last_earnings_update: Optional[datetime] = None
+        self.last_payout_at: Optional[datetime] = None
         
         # Load or generate identity
         if wallet_address:
@@ -63,6 +69,9 @@ class Node:
         
         # Set payment wallet (defaults to wallet_address if not specified)
         self.payment_wallet = payment_wallet if payment_wallet else self.wallet_address
+
+        if self.last_earnings_update is None:
+            self.last_earnings_update = datetime.now()
         
         # Save identity
         self._save_identity()
@@ -93,13 +102,35 @@ class Node:
                             self.storage_mapper_name = data['storage_mapper_name']
                         if 'committed_storage_gb' in data:
                             self.committed_storage_gb = float(data['committed_storage_gb'])
-                        if 'total_profit_eth' in data:
-                            self.total_profit_eth = float(data['total_profit_eth'])
-                        if 'profit_start_time' in data:
+                        if 'total_earned_moxi' in data:
+                            self.total_earned_moxi = float(data['total_earned_moxi'])
+                        elif 'total_profit_eth' in data:
+                            # Backwards compatibility with ETH payout field
+                            self.total_earned_moxi = float(data['total_profit_eth'])
+                        if 'earnings_balance_moxi' in data:
+                            self.earnings_balance_moxi = float(data['earnings_balance_moxi'])
+                        elif 'total_profit_eth' in data and self.earnings_balance_moxi == 0.0:
+                            self.earnings_balance_moxi = float(data['total_profit_eth'])
+                        earnings_start_raw = data.get('earnings_start_time') or data.get('profit_start_time')
+                        if earnings_start_raw:
                             try:
-                                self.profit_start_time = datetime.fromisoformat(data['profit_start_time'])
+                                self.earnings_start_time = datetime.fromisoformat(earnings_start_raw)
                             except (ValueError, TypeError):
-                                self.profit_start_time = None
+                                self.earnings_start_time = None
+                        last_update_raw = data.get('last_earnings_update')
+                        if last_update_raw:
+                            try:
+                                self.last_earnings_update = datetime.fromisoformat(last_update_raw)
+                            except (ValueError, TypeError):
+                                self.last_earnings_update = None
+                        payout_raw = data.get('last_payout_at')
+                        if payout_raw:
+                            try:
+                                self.last_payout_at = datetime.fromisoformat(payout_raw)
+                            except (ValueError, TypeError):
+                                self.last_payout_at = None
+                        if self.last_earnings_update is None:
+                            self.last_earnings_update = datetime.now()
                         return wallet
             except (json.JSONDecodeError, KeyError) as e:
                 print(f"⚠️  Error loading identity file: {e}. Generating new identity.")
@@ -115,8 +146,11 @@ class Node:
             'payment_wallet': self.payment_wallet,
             'storage_lending_enabled': self.storage_lending_enabled,
             'committed_storage_gb': self.committed_storage_gb,
-            'total_profit_eth': self.total_profit_eth,
-            'profit_start_time': self.profit_start_time.isoformat() if self.profit_start_time else None,
+            'total_earned_moxi': self.total_earned_moxi,
+            'earnings_balance_moxi': self.earnings_balance_moxi,
+            'earnings_start_time': self.earnings_start_time.isoformat() if self.earnings_start_time else None,
+            'last_earnings_update': self.last_earnings_update.isoformat() if self.last_earnings_update else None,
+            'last_payout_at': self.last_payout_at.isoformat() if self.last_payout_at else None,
             'created_at': self.uptime_start.isoformat(),
             'storage_mount_path': self.storage_mount_path,
             'storage_backing_file': self.storage_backing_file,
@@ -213,21 +247,82 @@ class Node:
     
     def set_committed_storage(self, committed_gb: float):
         """Set the amount of storage committed to the registry."""
+        self._accumulate_earnings()
         self.committed_storage_gb = max(0.0, committed_gb)
+        self.last_earnings_update = datetime.now()
         self._save_identity()
     
-    def add_profit(self, profit_eth: float):
-        """Add profit earned from storage lending."""
-        self.total_profit_eth += profit_eth
-        if self.profit_start_time is None:
-            self.profit_start_time = datetime.now()
+    def add_profit(self, profit_moxi: float):
+        """Add profit earned from storage lending (manual adjustment)."""
+        if profit_moxi <= 0:
+            return
+        self.total_earned_moxi += profit_moxi
+        self.earnings_balance_moxi += profit_moxi
+        if self.earnings_start_time is None:
+            self.earnings_start_time = datetime.now()
         self._save_identity()
+
+    def _current_payout_rate(self) -> float:
+        """Return the current payout rate in MOXI per second."""
+        return max(0.0, self.committed_storage_gb / 10.0 * MOXI_PER_SECOND_PER_10_GB)
+
+    def get_payout_rate_moxi_per_second(self) -> float:
+        """Public accessor for the payout rate."""
+        return self._current_payout_rate()
+
+    def _accumulate_earnings(self) -> None:
+        """Update accrued earnings based on elapsed time and committed storage."""
+        now = datetime.now()
+        if self.last_earnings_update is None:
+            self.last_earnings_update = now
+            return
+        elapsed = (now - self.last_earnings_update).total_seconds()
+        if elapsed <= 0:
+            return
+        rate = self._current_payout_rate()
+        earned = rate * elapsed
+        if earned > 0:
+            self.earnings_balance_moxi += earned
+            self.total_earned_moxi += earned
+            if self.earnings_start_time is None:
+                self.earnings_start_time = now
+        self.last_earnings_update = now
+        if earned > 0:
+            self._save_identity()
+
+    def get_pending_earnings_moxi(self) -> float:
+        """Return up-to-date pending earnings in MOXI."""
+        self._accumulate_earnings()
+        return self.earnings_balance_moxi
+
+    def claim_earnings(self) -> Dict[str, Any]:
+        """Claim accumulated earnings and reset the pending balance."""
+        self._accumulate_earnings()
+        payout_amount = self.earnings_balance_moxi
+        if payout_amount <= 0:
+            return {
+                'amount_moxi': 0.0,
+                'payout_wallet': self.payment_wallet,
+                'payout_at': datetime.now().isoformat()
+            }
+        payout_time = datetime.now()
+        self.earnings_balance_moxi = 0.0
+        self.last_payout_at = payout_time
+        self._save_identity()
+        return {
+            'amount_moxi': payout_amount,
+            'payout_wallet': self.payment_wallet,
+            'payout_at': payout_time.isoformat()
+        }
+
     
     def get_status(self) -> Dict[str, Any]:
         """Get current node status with real system stats."""
         total_gb, free_gb = self._get_disk_stats()
         uptime_seconds = self.get_uptime_seconds()
         available_gb = max(0.0, free_gb - self.committed_storage_gb)
+        self._accumulate_earnings()
+        payout_rate = self.get_payout_rate_moxi_per_second()
         
         return {
             'wallet_address': self.wallet_address,
@@ -237,7 +332,10 @@ class Node:
             'used_storage_gb': round(total_gb - free_gb, 2),
             'available_storage_gb': round(available_gb, 2),
             'committed_storage_gb': round(self.committed_storage_gb, 2),
-            'total_profit_eth': round(self.total_profit_eth, 6),
+            'total_earned_moxi': round(self.total_earned_moxi, 6),
+            'pending_earnings_moxi': round(self.earnings_balance_moxi, 6),
+            'payout_rate_moxi_per_second': round(payout_rate, 6),
+            'last_payout_at': self.last_payout_at.isoformat() if self.last_payout_at else None,
             'storage_mount_path': self.storage_mount_path,
             'uptime_seconds': uptime_seconds,
             'uptime_formatted': self.format_uptime(),

@@ -85,15 +85,14 @@ class StorageVolumeManager:
         )
 
     def release_storage(self) -> Dict[str, object]:
-        """Shrink the backing file back to zero without deleting it."""
+        """Remove the backing file entirely when releasing storage."""
         self._ensure_directories()
         if self.backing_file.exists():
-            with open(self.backing_file, "r+b") as volume_file:
-                volume_file.truncate(0)
-        else:
-            with open(self.backing_file, "wb"):
-                pass
-        return self._describe("Released reserved storage.")
+            try:
+                self.backing_file.unlink()
+            except OSError as exc:
+                raise RuntimeError(f"Failed to delete backing file: {exc}") from exc
+        return self._describe("Deleted encrypted backing file.")
 
     def describe(self) -> Dict[str, object]:
         """Return metadata without mutating the backing file."""

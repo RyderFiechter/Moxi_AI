@@ -11,6 +11,7 @@ import uvicorn
 from node import Node
 from node_api import app, set_node, set_registry_client, set_storage_volume_manager
 from storage_volume import StorageVolumeManager
+from blockchain.registry import StorageRegistryClient, WEB3_AVAILABLE
 
 
 def load_config(config_file: str = "config.json") -> dict:
@@ -108,10 +109,11 @@ async def run_node(config: dict):
     registry_config = config.get("registry", {})
     registry_client = None
     
-    if registry_config.get("contract_address") and registry_config.get("rpc_url"):
+    if not WEB3_AVAILABLE:
+        print("⚠️  Web3.py not installed. Blockchain registry features are disabled.")
+        print("   Install optional deps via: pip install -r node/requirements-web3.txt")
+    elif registry_config.get("contract_address") and registry_config.get("rpc_url"):
         try:
-            from blockchain.registry import StorageRegistryClient
-            
             # Get private key from environment or config
             private_key = os.getenv("PRIVATE_KEY") or registry_config.get("private_key")
             
@@ -154,6 +156,8 @@ async def run_node(config: dict):
                 print("   1. Set PRIVATE_KEY environment variable: $env:PRIVATE_KEY='your_key'")
                 print("   2. Or add 'private_key' to registry config in config.json")
                 print("   3. Restart the node after setting the private key")
+        except ImportError as e:
+            print(f"⚠️  Registry disabled: {e}")
         except Exception as e:
             print(f"⚠️  Could not initialize registry client: {e}")
             print("   Node will run without blockchain features.")
@@ -173,6 +177,7 @@ async def run_node(config: dict):
     print(f"   PUT  http://{host}:{port}/payment-wallet - Update payment wallet")
     print(f"   POST http://{host}:{port}/storage-lending/enable - Enable storage lending")
     print(f"   POST http://{host}:{port}/storage-lending/disable - Disable storage lending")
+    print(f"   POST http://{host}:{port}/payout - Send pending MOXI payout")
     if registry_client:
         print(f"   POST http://{host}:{port}/registry/register - Register with registry")
         print(f"   POST http://{host}:{port}/registry/update - Update storage")

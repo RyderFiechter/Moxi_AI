@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Dict, Any, Optional
 import os
+import secrets
 from node import Node
 from storage_volume import StorageVolumeManager
 
@@ -59,6 +60,7 @@ async def root():
             "/config": "GET/PUT - Get/update configuration",
             "/payment-wallet": "PUT - Update payment wallet",
             "/storage-lending": "POST - Enable/disable storage lending",
+            "/payout": "POST - Send pending MOXI payout",
             "/registry/register": "POST - Register with StorageRegistry",
             "/registry/update": "POST - Update storage in registry",
             "/registry/status": "GET - Get registry status"
@@ -217,6 +219,34 @@ async def disable_storage_lending():
         "message": release_info["message"] if release_info else "Storage lending disabled",
         "storage_lending_enabled": node_instance.storage_lending_enabled,
         "encrypted_volume": release_info
+    }
+
+
+@app.post("/payout")
+async def send_payout():
+    """Send accumulated MOXI earnings to the configured wallet."""
+    if node_instance is None:
+        raise HTTPException(status_code=503, detail="Node not initialized")
+    
+    payout_info = node_instance.claim_earnings()
+    amount = payout_info.get("amount_moxi", 0.0)
+    payout_wallet = payout_info.get("payout_wallet") or node_instance.wallet_address
+    
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="No earnings available for payout")
+    
+    tx_hash = f"0x{secrets.token_hex(32)}"
+    return {
+        "message": f"Sent {amount:.4f} MOXI to {payout_wallet}",
+        "amount_moxi": amount,
+        "payout_wallet": payout_wallet,
+        "last_payout_at": payout_info.get("payout_at"),
+        "transaction": {
+            "hash": tx_hash,
+            "token": "MOXI",
+            "status": "simulated"
+        },
+        "pending_earnings_moxi": node_instance.get_pending_earnings_moxi()
     }
 
 

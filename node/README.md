@@ -18,19 +18,25 @@ A complete, modular client-side application for running a storage provider node 
 ## Requirements
 
 - Python 3.10 or higher
-- Dependencies: `fastapi`, `uvicorn`, `psutil`, `web3`, `pydantic`
+- Core dependencies: `fastapi`, `uvicorn`, `psutil`
+- **Optional (blockchain features)**: `web3` and friends. Install only if you plan to use the registry client.
 
 ## Installation
 
-1. Install dependencies:
+1. Install the core dependencies:
 ```bash
 cd node
 pip install -r requirements.txt
 ```
 
-2. Configure your node in `config.json` (see Configuration section)
+2. (Optional) Enable blockchain/registry integrations. This step requires a compiler toolchain (MSVC on Windows, build-essential on Linux). When you're ready:
+```bash
+pip install -r requirements-web3.txt
+```
 
-3. (Optional) Set `PRIVATE_KEY` environment variable for blockchain transactions:
+3. Configure your node in `config.json` (see Configuration section)
+
+4. (Optional) Set `PRIVATE_KEY` environment variable for blockchain transactions:
 ```bash
 export PRIVATE_KEY=your_private_key_here
 ```
@@ -159,9 +165,12 @@ Features:
 - View real-time node status
 - Update payment wallet address
 - Enable/disable storage lending
+- Trigger on-demand MOXI payouts without disabling lending
 - Register with blockchain registry
 - Update storage availability
 - Activate/deactivate in registry
+
+Rewards accrue at a fixed rate of **1 MOXI per second for every 10 GB** of committed storage. Pending balances remain active while lending is enabled and can be sent to your payment wallet via the payout endpoint or dashboard button at any time.
 
 ## HTTP API Endpoints
 
@@ -176,6 +185,7 @@ Features:
 - **PUT `/payment-wallet`** - Update payment wallet address
 - **POST `/storage-lending/enable`** - Enable storage lending
 - **POST `/storage-lending/disable`** - Disable storage lending
+- **POST `/payout`** - Send pending MOXI earnings to the payment wallet
 
 ### Blockchain Registry
 

@@ -78,6 +78,7 @@ If you were using the old simulator:
    ```bash
    pip install -r requirements.txt
    ```
+   - Need blockchain registry support? Install the optional extras later via `pip install -r requirements-web3.txt` (requires build tools).
 
 2. **Run the new node:**
    ```bash

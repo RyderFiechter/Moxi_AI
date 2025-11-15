@@ -14,7 +14,10 @@ type NodeStatus = {
   used_storage_gb: number;
   available_storage_gb: number;
   committed_storage_gb?: number;
-  total_profit_eth?: number;
+  total_earned_moxi?: number;
+  pending_earnings_moxi?: number;
+  payout_rate_moxi_per_second?: number;
+  last_payout_at?: string;
   uptime_formatted: string;
   is_online: boolean;
   registry?: {
@@ -203,13 +206,10 @@ export default function StorageDashboard() {
       return data;
     }, 'Registered with StorageRegistry');
 
-  const updateRegistryStorage = () =>
+  const refreshNodeData = () =>
     handleAction(async () => {
-      const data = await fetchJson('/registry/update', {
-        method: 'POST',
-      });
-      return data;
-    }, 'Storage updated on-chain');
+      return { message: 'Storage metrics refreshed' };
+    }, 'Storage metrics refreshed');
 
   const activateRegistry = () =>
     handleAction(async () => {
@@ -226,6 +226,14 @@ export default function StorageDashboard() {
       });
       return data;
     }, 'Provider deactivated');
+
+  const sendPayout = () =>
+    handleAction(async () => {
+      const data = await fetchJson('/payout', {
+        method: 'POST',
+      });
+      return data;
+    }, 'Payout sent');
 
   const actionStateClass =
     actionState === 'loading'
@@ -323,16 +331,44 @@ export default function StorageDashboard() {
                     </dd>
                   </div>
                 )}
-                {status.total_profit_eth !== undefined && (
+                {status.pending_earnings_moxi !== undefined && (
                   <div className="rounded-md bg-emerald-50 p-3 dark:bg-emerald-900/20">
                     <dt className="text-emerald-600 dark:text-emerald-400 font-medium">
-                      Total Profit (ETH)
+                      Pending Earnings (MOXI)
                     </dt>
                     <dd className="text-lg font-semibold text-emerald-700 dark:text-emerald-300">
-                      {status.total_profit_eth.toFixed(6)} ETH
+                      {status.pending_earnings_moxi.toFixed(4)} MOXI
                     </dd>
                     <dd className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
-                      From storage lending
+                      Ready to send without disabling lending
+                    </dd>
+                  </div>
+                )}
+                {status.total_earned_moxi !== undefined && (
+                  <div className="rounded-md bg-emerald-50 p-3 dark:bg-emerald-900/20">
+                    <dt className="text-emerald-600 dark:text-emerald-400 font-medium">
+                      Lifetime Earnings (MOXI)
+                    </dt>
+                    <dd className="text-lg font-semibold text-emerald-700 dark:text-emerald-300">
+                      {status.total_earned_moxi.toFixed(4)} MOXI
+                    </dd>
+                    <dd className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
+                      {status.last_payout_at
+                        ? `Last payout: ${new Date(status.last_payout_at).toLocaleString()}`
+                        : 'No payouts sent yet'}
+                    </dd>
+                  </div>
+                )}
+                {status.payout_rate_moxi_per_second !== undefined && (
+                  <div className="rounded-md bg-purple-50 p-3 dark:bg-purple-900/20">
+                    <dt className="text-purple-600 dark:text-purple-300 font-medium">
+                      Pay Rate
+                    </dt>
+                    <dd className="text-lg font-semibold text-purple-700 dark:text-purple-200">
+                      {status.payout_rate_moxi_per_second.toFixed(4)} MOXI / sec
+                    </dd>
+                    <dd className="text-xs text-purple-600 dark:text-purple-300 mt-1">
+                      1 MOXI per second for every 10 GB committed
                     </dd>
                   </div>
                 )}
@@ -429,6 +465,43 @@ export default function StorageDashboard() {
                     Disable
                   </button>
                 </div>
+              </div>
+
+              <div className="rounded-md border border-indigo-200 bg-indigo-50 p-4 dark:border-indigo-500/40 dark:bg-indigo-900/20">
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  Rewards &amp; Payouts
+                </p>
+                <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                  Earn 1 MOXI per second for every 10 GB you have committed. Payouts go
+                  straight to your configured payment wallet without disabling lending.
+                </p>
+                <dl className="mt-3 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+                  <div>
+                    <dt className="text-gray-500 dark:text-gray-400">Pending</dt>
+                    <dd className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                      {status?.pending_earnings_moxi?.toFixed(4) ?? '0.0000'} MOXI
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-gray-500 dark:text-gray-400">Pay Rate</dt>
+                    <dd className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                      {status?.payout_rate_moxi_per_second?.toFixed(4) ?? '0.0000'} MOXI / sec
+                    </dd>
+                  </div>
+                </dl>
+                <button
+                  onClick={sendPayout}
+                  className="mt-3 inline-flex items-center rounded-md bg-purple-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-60"
+                  disabled={
+                    actionState === 'loading' ||
+                    (status?.pending_earnings_moxi ?? 0) <= 0
+                  }
+                >
+                  Send Payout
+                </button>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Destination: {config?.payment_wallet || status?.payment_wallet || status?.wallet_address}
+                </p>
               </div>
             </div>
           </section>
@@ -582,7 +655,7 @@ export default function StorageDashboard() {
                     Register / Update Offer
                   </button>
                   <button
-                    onClick={updateRegistryStorage}
+                    onClick={refreshNodeData}
                     className="inline-flex items-center rounded-md bg-gray-200 px-4 py-2 text-sm font-medium text-gray-800 shadow hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 disabled:opacity-60 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
                     disabled={actionState === 'loading'}
                   >

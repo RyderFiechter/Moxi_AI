@@ -5,9 +5,17 @@ Handles registration, updates, and queries to the StorageRegistry.
 
 import json
 from typing import Optional, Dict, Any
-from web3 import Web3
-from web3.types import TxReceipt
+
+try:
+    from web3 import Web3
+    from web3.types import TxReceipt
+except ImportError:
+    Web3 = None  # type: ignore
+    TxReceipt = Any  # type: ignore
+
 from .web3_config import get_web3_instance
+
+WEB3_AVAILABLE = Web3 is not None
 
 
 # StorageRegistry ABI (minimal for interaction)
@@ -102,6 +110,12 @@ class StorageRegistryClient:
             rpc_url: RPC URL for blockchain connection
             private_key: Private key for signing transactions (optional for read-only)
         """
+        if Web3 is None:
+            raise ImportError(
+                "web3 is not installed. Install optional deps via `pip install -r node/requirements-web3.txt` "
+                "to enable blockchain registry features."
+            )
+
         self.contract_address = Web3.to_checksum_address(contract_address)
         self.w3 = get_web3_instance(rpc_url)
         

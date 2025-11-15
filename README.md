@@ -116,7 +116,7 @@ npx hardhat verify --network <network-name> <contract-address> "DePIN Network To
 ## Storage Node & dApp Workflow
 
 1. **Run the storage node**
-   - Install Python deps and prep config: `cd node && pip install -r requirements.txt`, then edit `config.json` with your RPC URL, registry contract, and storage size. Export `PRIVATE_KEY` (or add it to the config) if you want blockchain registration.
+   - Install Python deps and prep config: `cd node && pip install -r requirements.txt`. Install optional blockchain tooling later via `pip install -r requirements-web3.txt` if you need StorageRegistry calls. Then edit `config.json` with your RPC URL, registry contract, and storage size. Export `PRIVATE_KEY` (or add it to the config) if you want blockchain registration.
    - (Optional) Provision an encrypted sparse volume with `node/scripts/setup_encrypted_volume.sh` and set `storage.mount_path` to the mounted directory so reserved space is visible to the OS and dashboard.
    - Start the provider: `python main.py`. This boots the FastAPI server on port `8000`, begins publishing real disk stats, and serves the dashboard at `http://localhost:8000/ui`.
 

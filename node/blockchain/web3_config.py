@@ -3,11 +3,15 @@ Web3 configuration and setup for blockchain interactions.
 """
 
 import os
-from web3 import Web3
 from typing import Optional
 
+try:
+    from web3 import Web3
+except ImportError:
+    Web3 = None  # type: ignore
 
-def get_web3_instance(rpc_url: Optional[str] = None) -> Optional[Web3]:
+
+def get_web3_instance(rpc_url: Optional[str] = None) -> Optional["Web3"]:
     """
     Create and return a Web3 instance.
     
@@ -17,6 +21,10 @@ def get_web3_instance(rpc_url: Optional[str] = None) -> Optional[Web3]:
     Returns:
         Web3 instance or None if no RPC URL available.
     """
+    if Web3 is None:
+        print("⚠️  Web3.py is not installed. Install optional deps via `pip install -r node/requirements-web3.txt`.")
+        return None
+
     if not rpc_url:
         # Try to get from environment variables
         rpc_url = os.getenv("ARBITRUM_SEPOLIA_RPC_URL") or os.getenv("RPC_URL")
@@ -36,7 +44,7 @@ def get_web3_instance(rpc_url: Optional[str] = None) -> Optional[Web3]:
         return None
 
 
-def get_chain_id(w3: Web3) -> Optional[int]:
+def get_chain_id(w3: "Web3") -> Optional[int]:
     """Get chain ID from Web3 instance."""
     try:
         return w3.eth.chain_id
