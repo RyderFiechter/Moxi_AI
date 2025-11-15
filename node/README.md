@@ -170,7 +170,7 @@ Features:
 - Update storage availability
 - Activate/deactivate in registry
 
-Rewards accrue at a fixed rate of **1 MOXI per second for every 10 GB** of committed storage. Pending balances remain active while lending is enabled and can be sent to your payment wallet via the payout endpoint or dashboard button at any time.
+Rewards accrue at a fixed rate of **1 MOXI per hour for every 10 GB** of committed storage. Pending balances remain active while lending is enabled and can be sent to your payment wallet via the payout endpoint or dashboard button at any time.
 
 ## HTTP API Endpoints
 
@@ -200,6 +200,24 @@ Rewards accrue at a fixed rate of **1 MOXI per second for every 10 GB** of commi
 
 - **GET `/docs`** - Interactive API documentation (Swagger UI)
 - **GET `/ui`** - Web dashboard
+
+## MOXI Payout Configuration
+
+Triggering `POST /payout` (or the dashboard button) now signs and broadcasts a real ERC-20 `transfer` so your payment wallet receives MOXI on-chain. Configure it by:
+
+1. Deploying/funding the `DePINToken` (or whichever ERC-20 you want to distribute) with the wallet whose private key the node controls.
+2. Filling in the `token` block inside `node/config.json`:
+   ```jsonc
+   "token": {
+     "address": "0xYourTokenAddress",
+     "rpc_url": "https://arb-sepolia.example", // leave blank to reuse registry.rpc_url
+     "private_key": ""                         // optional override; falls back to PRIVATE_KEY
+   }
+   ```
+   You can also set `TOKEN_ADDRESS` as an environment variable; when unset, payouts reuse the registry RPC URL and the `PRIVATE_KEY`.
+3. Restarting the node. Startup logs will include `✅ Token payout client initialized` once everything is wired up.
+
+If any field is missing the `/payout` endpoint returns `503` so you know to finish configuration. Successful calls return the actual transaction hash, block number, gas used, and the pending balance after settlement.
 
 ## Project Structure
 

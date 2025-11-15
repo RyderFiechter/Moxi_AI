@@ -1,7 +1,7 @@
 {
   "network": "arbitrum-sepolia",
   "chainId": 421614,
-  "contractAddress": "0xB6d8a31e262d30A1D74804d68B6880224975Fd5C",
+  "contractAddress": "0x1629161cc7BDD3f51428CfE1bC1b8cb54FdaDdFD",
   "deployer": "0x4d6e685750fC78647b60589bee395D12b154B900",
   "tokenName": "Moxi AI",
   "tokenSymbol": "MOXI",

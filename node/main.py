@@ -9,9 +9,16 @@ import json
 import os
 import uvicorn
 from node import Node
-from node_api import app, set_node, set_registry_client, set_storage_volume_manager
+from node_api import (
+    app,
+    set_node,
+    set_registry_client,
+    set_storage_volume_manager,
+    set_token_client,
+)
 from storage_volume import StorageVolumeManager
 from blockchain.registry import StorageRegistryClient, WEB3_AVAILABLE
+from blockchain.token import ERC20TokenClient
 
 
 def load_config(config_file: str = "config.json") -> dict:
@@ -36,6 +43,11 @@ def load_config(config_file: str = "config.json") -> dict:
             "auto_register": False,
             "auto_update_interval": 300,
             "price_per_gb_eth": "0.001"
+        },
+        "token": {
+            "address": "",
+            "rpc_url": "",
+            "private_key": ""
         }
     }
     
@@ -108,6 +120,7 @@ async def run_node(config: dict):
     # Initialize blockchain/registry if configured
     registry_config = config.get("registry", {})
     registry_client = None
+    token_client = None
     
     if not WEB3_AVAILABLE:
         print("⚠️  Web3.py not installed. Blockchain registry features are disabled.")
@@ -162,6 +175,41 @@ async def run_node(config: dict):
             print(f"⚠️  Could not initialize registry client: {e}")
             print("   Node will run without blockchain features.")
             print("   Check that PRIVATE_KEY is set correctly and the RPC URL is valid.")
+
+    # Initialize ERC-20 payout client
+    token_config = config.get("token") or {}
+    token_address = (
+        token_config.get("address")
+        or config.get("token_address")
+        or os.getenv("TOKEN_ADDRESS")
+    )
+    token_rpc_url = token_config.get("rpc_url") or registry_config.get("rpc_url")
+    token_private_key = (
+        os.getenv("PRIVATE_KEY")
+        or token_config.get("private_key")
+        or registry_config.get("private_key")
+    )
+
+    if token_address:
+        if not WEB3_AVAILABLE:
+            print("⚠️  Token payouts require web3.py. Install via `pip install -r node/requirements-web3.txt`.")
+        elif not token_rpc_url:
+            print("⚠️  Token payouts configured without an RPC URL.")
+        elif not token_private_key:
+            print("⚠️  Token payouts require a PRIVATE_KEY in the environment or token config.")
+        else:
+            try:
+                token_client = ERC20TokenClient(
+                    token_address,
+                    token_rpc_url,
+                    token_private_key,
+                )
+                set_token_client(token_client)
+                print("✅ Token payout client initialized")
+                print(f"   Token: {token_client.symbol} ({token_client.contract_address})")
+                print(f"   Signer: {token_client.account_address}")
+            except Exception as e:
+                print(f"⚠️  Could not initialize token client: {e}")
     
     # Start node (this starts the ping loop)
     await node.start()

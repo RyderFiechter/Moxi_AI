@@ -11,7 +11,8 @@ from typing import Optional, Dict, Any
 import secrets
 import psutil
 
-MOXI_PER_SECOND_PER_10_GB = 1.0
+MOXI_PER_HOUR_PER_10_GB = 1.0  # Base accrual rate
+MOXI_PER_SECOND_PER_10_GB = MOXI_PER_HOUR_PER_10_GB / 3600.0
 MOXI_PER_SECOND_PER_GB = MOXI_PER_SECOND_PER_10_GB / 10.0
 
 
@@ -295,22 +296,51 @@ class Node:
         self._accumulate_earnings()
         return self.earnings_balance_moxi
 
-    def claim_earnings(self) -> Dict[str, Any]:
-        """Claim accumulated earnings and reset the pending balance."""
+    def claim_earnings(self, commit: bool = True) -> Dict[str, Any]:
+        """
+        Claim accumulated earnings.
+
+        Args:
+            commit: When False, returns the payout payload without mutating balances.
+        """
         self._accumulate_earnings()
         payout_amount = self.earnings_balance_moxi
+        payout_time = datetime.now()
+
+        if commit and payout_amount > 0:
+            self.earnings_balance_moxi = 0.0
+            self.last_payout_at = payout_time
+            self._save_identity()
+
+        return {
+            'amount_moxi': payout_amount,
+            'payout_wallet': self.payment_wallet,
+            'payout_at': payout_time.isoformat()
+        }
+
+    def record_payout(self, payout_amount: float) -> Dict[str, Any]:
+        """
+        Persist a successful payout by deducting the transferred amount.
+
+        Args:
+            payout_amount: Amount of MOXI that was actually transferred.
+        """
+        self._accumulate_earnings()
+        payout_time = datetime.now()
         if payout_amount <= 0:
             return {
                 'amount_moxi': 0.0,
                 'payout_wallet': self.payment_wallet,
-                'payout_at': datetime.now().isoformat()
+                'payout_at': payout_time.isoformat()
             }
-        payout_time = datetime.now()
-        self.earnings_balance_moxi = 0.0
+
+        amount_to_record = min(payout_amount, self.earnings_balance_moxi)
+        self.earnings_balance_moxi -= amount_to_record
         self.last_payout_at = payout_time
         self._save_identity()
+
         return {
-            'amount_moxi': payout_amount,
+            'amount_moxi': amount_to_record,
             'payout_wallet': self.payment_wallet,
             'payout_at': payout_time.isoformat()
         }

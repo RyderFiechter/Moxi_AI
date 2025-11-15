@@ -24,8 +24,13 @@ This repo ships a `node/config.json` that contains operator-specific values (key
     "auto_register": false,
     "auto_update_interval": 300,
     "price_per_gb_eth": "0.001"
+  },
+  "token": {
+    "address": "<DEPIN_TOKEN_ADDRESS>",
+    "rpc_url": "<RPC_URL_OR_EMPTY_TO_USE_REGISTRY_RPC>",
+    "private_key": "<PRIVATE_KEY_OVERRIDE_OR_EMPTY>"
   }
 }
 ```
 
-> **Note:** `private_key` is optional if you export `PRIVATE_KEY`/`CONTROLLER_PRIVATE_KEY` as environment variables before starting the node. If you keep it in the JSON file, ensure `node/config.json` never leaves your secure environment.
+> **Note:** Token payouts reuse the same `PRIVATE_KEY` and RPC URL if you leave the token fields blank. Override them when the payout signer lives on a different network or wallet.

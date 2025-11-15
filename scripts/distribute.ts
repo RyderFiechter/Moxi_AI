@@ -17,6 +17,7 @@ interface Recipient {
 
 // Recipients list - Edit this with your addresses and amounts
 const recipients: Recipient[] = [
+  { address: "0x82a9337252d946933225bf0e2285991f5207f043", amount: "10000" }
   // Example format:
   // { address: "0x1234567890123456789012345678901234567890", amount: "10000" }, // 10,000 tokens
   // { address: "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd", amount: "5000" },  // 5,000 tokens

@@ -8,8 +8,8 @@ from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Dict, Any, Optional
+from decimal import Decimal
 import os
-import secrets
 from node import Node
 from storage_volume import StorageVolumeManager
 
@@ -33,6 +33,7 @@ app.add_middleware(
 node_instance: Node = None
 registry_client = None  # Will be set by main.py if blockchain is configured
 storage_volume_manager: Optional[StorageVolumeManager] = None
+token_client = None  # Set by main.py when payouts are fully configured
 
 # Request models
 class PaymentWalletUpdate(BaseModel):
@@ -227,26 +228,46 @@ async def send_payout():
     """Send accumulated MOXI earnings to the configured wallet."""
     if node_instance is None:
         raise HTTPException(status_code=503, detail="Node not initialized")
-    
-    payout_info = node_instance.claim_earnings()
-    amount = payout_info.get("amount_moxi", 0.0)
-    payout_wallet = payout_info.get("payout_wallet") or node_instance.wallet_address
-    
+    if token_client is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Token payout client not configured. Set token.address, RPC URL, and private key in config.json.",
+        )
+
+    payout_preview = node_instance.claim_earnings(commit=False)
+    amount = payout_preview.get("amount_moxi", 0.0)
+    payout_wallet = payout_preview.get("payout_wallet") or node_instance.wallet_address
+
     if amount <= 0:
         raise HTTPException(status_code=400, detail="No earnings available for payout")
-    
-    tx_hash = f"0x{secrets.token_hex(32)}"
+
+    try:
+        transfer_result = token_client.transfer_tokens(payout_wallet, Decimal(str(amount)))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Payout failed: {exc}") from exc
+
+    payout_record = node_instance.record_payout(float(transfer_result.amount_tokens))
+    pending_after = node_instance.get_pending_earnings_moxi()
+
+    amount_display = format(transfer_result.amount_tokens.normalize(), "f")
+    status_label = "confirmed" if transfer_result.receipt.status == 1 else "failed"
     return {
-        "message": f"Sent {amount:.4f} MOXI to {payout_wallet}",
-        "amount_moxi": amount,
+        "message": f"Sent {amount_display} {token_client.symbol} to {payout_wallet}",
+        "amount_moxi": payout_record.get("amount_moxi", float(transfer_result.amount_tokens)),
         "payout_wallet": payout_wallet,
-        "last_payout_at": payout_info.get("payout_at"),
+        "last_payout_at": payout_record.get("payout_at"),
         "transaction": {
-            "hash": tx_hash,
-            "token": "MOXI",
-            "status": "simulated"
+            "hash": transfer_result.tx_hash,
+            "status": status_label,
+            "block_number": transfer_result.receipt.blockNumber,
+            "gas_used": int(transfer_result.receipt.gasUsed),
         },
-        "pending_earnings_moxi": node_instance.get_pending_earnings_moxi()
+        "token": {
+            "symbol": token_client.symbol,
+            "decimals": token_client.decimals,
+            "contract": token_client.contract_address,
+        },
+        "pending_earnings_moxi": pending_after,
     }
 
 
@@ -525,6 +546,12 @@ def set_registry_client(client):
     """Set the global registry client (called by main.py)."""
     global registry_client
     registry_client = client
+
+
+def set_token_client(client):
+    """Configure the ERC-20 payout client (called by main.py)."""
+    global token_client
+    token_client = client
 
 
 def set_storage_volume_manager(manager: StorageVolumeManager):
