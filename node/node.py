@@ -22,7 +22,9 @@ class Node:
         identity_file: str = "node_identity.json",
         ping_interval: int = 30,
         storage_lending_enabled: bool = False,
-        storage_mount_path: str = "/"
+        storage_mount_path: str = "/",
+        storage_backing_file: Optional[str] = None,
+        storage_mapper_name: Optional[str] = None
     ):
         """
         Initialize a node with real system stats.
@@ -43,6 +45,8 @@ class Node:
         self._ping_task: Optional[asyncio.Task] = None
         self.storage_lending_enabled = storage_lending_enabled
         self.storage_mount_path = storage_mount_path or "/"
+        self.storage_backing_file = storage_backing_file
+        self.storage_mapper_name = storage_mapper_name
         
         # Track committed storage (storage registered on-chain, no longer available)
         self.committed_storage_gb: float = 0.0
@@ -83,6 +87,10 @@ class Node:
                             self.storage_lending_enabled = data['storage_lending_enabled']
                         if 'storage_mount_path' in data and data['storage_mount_path']:
                             self.storage_mount_path = data['storage_mount_path']
+                        if 'storage_backing_file' in data and data['storage_backing_file']:
+                            self.storage_backing_file = data['storage_backing_file']
+                        if 'storage_mapper_name' in data and data['storage_mapper_name']:
+                            self.storage_mapper_name = data['storage_mapper_name']
                         if 'committed_storage_gb' in data:
                             self.committed_storage_gb = float(data['committed_storage_gb'])
                         if 'total_profit_eth' in data:
@@ -110,7 +118,9 @@ class Node:
             'total_profit_eth': self.total_profit_eth,
             'profit_start_time': self.profit_start_time.isoformat() if self.profit_start_time else None,
             'created_at': self.uptime_start.isoformat(),
-            'storage_mount_path': self.storage_mount_path
+            'storage_mount_path': self.storage_mount_path,
+            'storage_backing_file': self.storage_backing_file,
+            'storage_mapper_name': self.storage_mapper_name
         }
         
         try:

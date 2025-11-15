@@ -9,7 +9,8 @@ import json
 import os
 import uvicorn
 from node import Node
-from node_api import app, set_node, set_registry_client
+from node_api import app, set_node, set_registry_client, set_storage_volume_manager
+from storage_volume import StorageVolumeManager
 
 
 def load_config(config_file: str = "config.json") -> dict:
@@ -78,6 +79,8 @@ async def run_node(config: dict):
     if storage_mount_path and not os.path.exists(storage_mount_path):
         print(f"⚠️  Storage mount path '{storage_mount_path}' does not exist yet. Falling back to '/'.")
         storage_mount_path = "/"
+    storage_backing_file = storage_config.get("backing_file")
+    storage_mapper_name = storage_config.get("mapper_name")
     
     node = Node(
         wallet_address=wallet_address,
@@ -85,11 +88,21 @@ async def run_node(config: dict):
         identity_file=config.get("identity_file", "node_identity.json"),
         ping_interval=config.get("ping_interval", 30),
         storage_lending_enabled=storage_lending_enabled,
-        storage_mount_path=storage_mount_path
+        storage_mount_path=storage_mount_path,
+        storage_backing_file=storage_backing_file,
+        storage_mapper_name=storage_mapper_name
     )
     
     # Set node in API
     set_node(node)
+
+    # Attach storage manager for encrypted volume handling
+    storage_manager = StorageVolumeManager(
+        mount_path=storage_mount_path,
+        backing_file=storage_backing_file,
+        mapper_name=storage_mapper_name,
+    )
+    set_storage_volume_manager(storage_manager)
     
     # Initialize blockchain/registry if configured
     registry_config = config.get("registry", {})

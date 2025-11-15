@@ -54,6 +54,7 @@ type RegistryStatus =
     };
 
 type ActionState = 'idle' | 'loading' | 'success' | 'error';
+type ActionResult = { message?: string } | string | void | null;
 
 export default function StorageDashboard() {
   const [status, setStatus] = useState<NodeStatus | null>(null);
@@ -137,13 +138,20 @@ export default function StorageDashboard() {
     return () => clearInterval(interval);
   }, [loadStatus, loadConfig, loadRegistryStatus]);
 
-  const handleAction = async (fn: () => Promise<unknown>, success: string) => {
+  const handleAction = async (fn: () => Promise<ActionResult>, success: string) => {
     try {
       setActionState('loading');
       setActionMessage(null);
-      await fn();
+      const result = await fn();
+      let resolvedMessage: string | null = null;
+      if (typeof result === 'string') {
+        resolvedMessage = result;
+      } else if (result && typeof result === 'object' && 'message' in result) {
+        const typed = result as { message?: string | null };
+        resolvedMessage = typed.message ?? null;
+      }
       setActionState('success');
-      setActionMessage(success);
+      setActionMessage(resolvedMessage ?? success);
       await Promise.all([loadStatus(), loadConfig(), loadRegistryStatus()]);
     } catch (err) {
       setActionState('error');
@@ -158,18 +166,20 @@ export default function StorageDashboard() {
       if (!paymentWalletInput.startsWith('0x')) {
         throw new Error('Invalid address');
       }
-      await fetchJson('/payment-wallet', {
+      const data = await fetchJson('/payment-wallet', {
         method: 'PUT',
         body: JSON.stringify({ payment_wallet: paymentWalletInput }),
       });
+      return data;
     }, 'Payment wallet updated');
 
   const toggleStorageLending = (enabled: boolean) =>
-    handleAction(
-      () =>
-        fetchJson(`/storage-lending/${enabled ? 'enable' : 'disable'}`, {
-          method: 'POST',
-        }),
+    handleAction(async () => {
+      const data = await fetchJson(`/storage-lending/${enabled ? 'enable' : 'disable'}`, {
+        method: 'POST',
+      });
+      return data;
+    },
       enabled ? 'Storage lending enabled' : 'Storage lending disabled'
     );
 
@@ -183,41 +193,39 @@ export default function StorageDashboard() {
       if (!pricePerGB || pricePerGB <= 0) {
         throw new Error('Enter price per GB');
       }
-      await fetchJson('/registry/register', {
+      const data = await fetchJson('/registry/register', {
         method: 'POST',
         body: JSON.stringify({
           storage_gb: storageGB,
           price_per_gb_eth: pricePerGB,
         }),
       });
+      return data;
     }, 'Registered with StorageRegistry');
 
   const updateRegistryStorage = () =>
-    handleAction(
-      () =>
-        fetchJson('/registry/update', {
-          method: 'POST',
-        }),
-      'Storage updated on-chain'
-    );
+    handleAction(async () => {
+      const data = await fetchJson('/registry/update', {
+        method: 'POST',
+      });
+      return data;
+    }, 'Storage updated on-chain');
 
   const activateRegistry = () =>
-    handleAction(
-      () =>
-        fetchJson('/registry/activate', {
-          method: 'POST',
-        }),
-      'Provider activated'
-    );
+    handleAction(async () => {
+      const data = await fetchJson('/registry/activate', {
+        method: 'POST',
+      });
+      return data;
+    }, 'Provider activated');
 
   const deactivateRegistry = () =>
-    handleAction(
-      () =>
-        fetchJson('/registry/deactivate', {
-          method: 'POST',
-        }),
-      'Provider deactivated'
-    );
+    handleAction(async () => {
+      const data = await fetchJson('/registry/deactivate', {
+        method: 'POST',
+      });
+      return data;
+    }, 'Provider deactivated');
 
   const actionStateClass =
     actionState === 'loading'

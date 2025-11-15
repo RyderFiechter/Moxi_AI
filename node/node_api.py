@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from typing import Dict, Any, Optional
 import os
 from node import Node
+from storage_volume import StorageVolumeManager
 
 # Create FastAPI app
 app = FastAPI(
@@ -30,6 +31,7 @@ app.add_middleware(
 # Global node instance (will be set by main.py)
 node_instance: Node = None
 registry_client = None  # Will be set by main.py if blockchain is configured
+storage_volume_manager: Optional[StorageVolumeManager] = None
 
 # Request models
 class PaymentWalletUpdate(BaseModel):
@@ -85,6 +87,11 @@ async def get_status() -> Dict[str, Any]:
         )
     
     status = node_instance.get_status()
+    if storage_volume_manager:
+        try:
+            status['storage_volume'] = storage_volume_manager.describe()
+        except Exception as e:
+            status['storage_volume'] = {'error': str(e)}
     
     # Add registry information if available
     if registry_client:
@@ -170,10 +177,21 @@ async def enable_storage_lending():
     if node_instance is None:
         raise HTTPException(status_code=503, detail="Node not initialized")
     
+    volume_info = None
+    if storage_volume_manager:
+        try:
+            volume_info = storage_volume_manager.initialize_volume()
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to initialize encrypted storage: {e}"
+            )
+    
     node_instance.enable_storage_lending()
     return {
-        "message": "Storage lending enabled",
-        "storage_lending_enabled": node_instance.storage_lending_enabled
+        "message": volume_info["message"] if volume_info else "Storage lending enabled",
+        "storage_lending_enabled": node_instance.storage_lending_enabled,
+        "encrypted_volume": volume_info
     }
 
 
@@ -183,10 +201,22 @@ async def disable_storage_lending():
     if node_instance is None:
         raise HTTPException(status_code=503, detail="Node not initialized")
     
+    release_info = None
+    if storage_volume_manager:
+        try:
+            release_info = storage_volume_manager.release_storage()
+            node_instance.set_committed_storage(0)
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to release encrypted storage: {e}"
+            )
+    
     node_instance.disable_storage_lending()
     return {
-        "message": "Storage lending disabled",
-        "storage_lending_enabled": node_instance.storage_lending_enabled
+        "message": release_info["message"] if release_info else "Storage lending disabled",
+        "storage_lending_enabled": node_instance.storage_lending_enabled,
+        "encrypted_volume": release_info
     }
 
 
@@ -196,35 +226,66 @@ async def register_with_registry(request: RegisterRequest):
     if node_instance is None:
         raise HTTPException(status_code=503, detail="Node not initialized")
     
-    if registry_client is None:
-        raise HTTPException(
-            status_code=503, 
-            detail="Registry not configured. Set PRIVATE_KEY environment variable or add private_key to registry config in config.json. Restart the node after setting the private key."
-        )
+    storage_gb = int(request.storage_gb)
+    if storage_gb <= 0:
+        raise HTTPException(status_code=400, detail="Storage amount must be positive")
+    if request.price_per_gb_eth <= 0:
+        raise HTTPException(status_code=400, detail="Price per GB must be positive")
+
+    previous_committed = getattr(node_instance, "committed_storage_gb", 0.0)
+
+    volume_info = None
+    if storage_volume_manager:
+        try:
+            volume_info = storage_volume_manager.reserve_storage(storage_gb)
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to resize encrypted storage file: {e}"
+            )
     
     try:
-        from web3 import Web3
-        
-        # Convert ETH to wei
-        price_per_gb_wei = int(Web3.to_wei(request.price_per_gb_eth, 'ether'))
-        
-        receipt = registry_client.register_provider(
-            payment_wallet=node_instance.payment_wallet,
-            storage_gb=request.storage_gb,
-            price_per_gb_wei=price_per_gb_wei
-        )
-        
-        # Update committed storage
-        node_instance.set_committed_storage(request.storage_gb)
-        
-        return {
-            "message": "Registered with StorageRegistry",
-            "transaction_hash": receipt.transactionHash.hex(),
-            "block_number": receipt.blockNumber,
-            "committed_storage_gb": request.storage_gb
-        }
+        node_instance.set_committed_storage(storage_gb)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Registration failed: {str(e)}")
+        if storage_volume_manager:
+            storage_volume_manager.reserve_storage(previous_committed)
+        raise HTTPException(status_code=500, detail=f"Failed to record commitment: {e}")
+
+    registry_result: Dict[str, Any]
+    if registry_client:
+        try:
+            from web3 import Web3
+            price_per_gb_wei = int(Web3.to_wei(request.price_per_gb_eth, 'ether'))
+            receipt = registry_client.register_provider(
+                payment_wallet=node_instance.payment_wallet,
+                storage_gb=storage_gb,
+                price_per_gb_wei=price_per_gb_wei
+            )
+            registry_result = {
+                "transaction_hash": receipt.transactionHash.hex(),
+                "block_number": receipt.blockNumber,
+                "status": "submitted"
+            }
+        except Exception as e:
+            if storage_volume_manager:
+                storage_volume_manager.reserve_storage(previous_committed)
+            node_instance.set_committed_storage(previous_committed)
+            raise HTTPException(status_code=400, detail=f"Registration failed: {str(e)}")
+    else:
+        registry_result = {
+            "status": "skipped",
+            "message": "Registry not configured. Commitment recorded locally."
+        }
+
+    node_instance.enable_storage_lending()
+    payout_wallet = node_instance.payment_wallet or node_instance.wallet_address
+    return {
+        "message": f"Reserved {storage_gb} GB and started payouts to {payout_wallet}.",
+        "committed_storage_gb": node_instance.committed_storage_gb,
+        "payment_wallet": payout_wallet,
+        "encrypted_volume": volume_info,
+        "registry": registry_result
+    }
 
 
 @app.post("/registry/update")
@@ -240,10 +301,6 @@ async def update_registry_storage():
         )
     
     try:
-        # Get current registered storage from registry
-        provider_info = registry_client.get_provider_info(node_instance.wallet_address)
-        current_registered = provider_info['storageGB'] if provider_info else 0
-        
         # Get total free storage (not accounting for committed)
         # Use total storage - used storage to get free storage
         total_gb = node_instance.get_total_storage_gb()
@@ -252,6 +309,16 @@ async def update_registry_storage():
         
         # New registered storage = total free storage
         new_storage_gb = int(free_gb)
+
+        volume_info = None
+        if storage_volume_manager:
+            try:
+                volume_info = storage_volume_manager.reserve_storage(new_storage_gb)
+            except Exception as e:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to resize encrypted storage: {e}"
+                )
         
         receipt = registry_client.update_storage(new_storage_gb)
         
@@ -263,7 +330,8 @@ async def update_registry_storage():
             "storage_gb": new_storage_gb,
             "committed_storage_gb": new_storage_gb,
             "transaction_hash": receipt.transactionHash.hex(),
-            "block_number": receipt.blockNumber
+            "block_number": receipt.blockNumber,
+            "encrypted_volume": volume_info
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Update failed: {str(e)}")
@@ -427,4 +495,10 @@ def set_registry_client(client):
     """Set the global registry client (called by main.py)."""
     global registry_client
     registry_client = client
+
+
+def set_storage_volume_manager(manager: StorageVolumeManager):
+    """Set the storage volume manager for encrypted file operations."""
+    global storage_volume_manager
+    storage_volume_manager = manager
 

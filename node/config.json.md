@@ -12,7 +12,7 @@ This repo ships a `node/config.json` that contains operator-specific values (key
   "payment_wallet": "<PAYMENT_WALLET_OR_SAME_AS_ABOVE>",
   "storage_lending_enabled": false,
   "storage": {
-    "mount_path": "/mnt/moxi-node",
+    "mount_path": "/mnt/c/Users/Ryder/moxi-node",
     "mapper_name": "moxi-node",
     "backing_file": "/var/moxi/storage-node.img"
   },

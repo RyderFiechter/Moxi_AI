@@ -137,11 +137,17 @@ class StorageRegistryClient:
             'gasPrice': self.w3.eth.gas_price
         })
         
-        # Sign transaction - use account object directly (web3.py v6 compatible)
+        # Sign transaction - use account object directly
         signed_txn = self.account.sign_transaction(transaction)
         
-        # Send transaction - use raw_transaction (snake_case) for web3.py v6
-        tx_hash = self.w3.eth.send_raw_transaction(signed_txn.raw_transaction)
+        # web3.py 6.x exposes both camelCase and snake_case depending on release
+        raw_tx = getattr(signed_txn, "raw_transaction", None) or getattr(
+            signed_txn, "rawTransaction", None
+        )
+        if raw_tx is None:
+            raise ValueError("Signed transaction missing raw transaction bytes")
+        
+        tx_hash = self.w3.eth.send_raw_transaction(raw_tx)
         
         # Wait for receipt
         receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
