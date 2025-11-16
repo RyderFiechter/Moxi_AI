@@ -6,7 +6,10 @@ Handles node registration, ping aggregation, and periodic status summaries.
 import asyncio
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
-from node import Node
+try:
+    from .node import Node
+except ImportError:  # pragma: no cover
+    from node import Node  # type: ignore
 
 
 class Network:

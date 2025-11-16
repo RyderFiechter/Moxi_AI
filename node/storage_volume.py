@@ -4,10 +4,14 @@ This module keeps file handling logic isolated from node/node_api.
 """
 
 from __future__ import annotations
+import os
 from pathlib import Path
 from typing import Dict, Optional
 
 BYTES_PER_GB = 1024 ** 3
+DEFAULT_BACKING_DIR = Path("/var/moxi-node")
+DEFAULT_BACKING_FILENAME = "storage-node.img"
+
 
 
 class StorageVolumeManager:
@@ -22,18 +26,33 @@ class StorageVolumeManager:
         self.mount_path = Path(mount_path).expanduser()
         if backing_file:
             self.backing_file = Path(backing_file).expanduser()
+        elif os.name != "nt":
+            self.backing_file = DEFAULT_BACKING_DIR / DEFAULT_BACKING_FILENAME
         else:
-            # Default to a hidden file in the mount path
+            # Default to a hidden file in the mount path for Windows environments
             self.backing_file = self.mount_path / ".moxi_encrypted.bin"
         self.mapper_name = mapper_name or "moxi-node"
 
     def _ensure_directories(self) -> None:
         """Create mount/backing directories if they do not exist."""
-        if not self.mount_path.exists():
-            self.mount_path.mkdir(parents=True, exist_ok=True)
+        try:
+            if not self.mount_path.exists():
+                self.mount_path.mkdir(parents=True, exist_ok=True)
+        except PermissionError as exc:
+            raise PermissionError(
+                f"Cannot create mount path '{self.mount_path}'. "
+                "Run the node with elevated permissions or pre-create the directory."
+            ) from exc
+
         backing_parent = self.backing_file.parent
-        if not backing_parent.exists():
-            backing_parent.mkdir(parents=True, exist_ok=True)
+        try:
+            if not backing_parent.exists():
+                backing_parent.mkdir(parents=True, exist_ok=True)
+        except PermissionError as exc:
+            raise PermissionError(
+                f"Cannot create backing directory '{backing_parent}'. "
+                "Create it manually (e.g. `sudo mkdir -p /var/moxi-node && sudo chown $USER /var/moxi-node`)."
+            ) from exc
 
     def _current_size_bytes(self) -> int:
         """Return the current size of the encrypted backing file."""

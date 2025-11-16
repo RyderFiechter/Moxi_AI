@@ -14,7 +14,7 @@ This repo ships a `node/config.json` that contains operator-specific values (key
   "storage": {
     "mount_path": "/mnt/c/Users/Ryder/moxi-node",
     "mapper_name": "moxi-node",
-    "backing_file": "/var/moxi/storage-node.img"
+    "backing_file": "/var/moxi-node/storage-node.img"
   },
   "registry": {
     "contract_address": "<STORAGE_REGISTRY_ADDRESS>",
@@ -34,3 +34,5 @@ This repo ships a `node/config.json` that contains operator-specific values (key
 ```
 
 > **Note:** Token payouts reuse the same `PRIVATE_KEY` and RPC URL if you leave the token fields blank. Override them when the payout signer lives on a different network or wallet.
+
+Create the backing directory ahead of time (`sudo mkdir -p /var/moxi-node && sudo chown $USER /var/moxi-node`) so the node can place `storage-node.img` under `/var/moxi-node/`.

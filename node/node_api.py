@@ -10,8 +10,12 @@ from pydantic import BaseModel
 from typing import Dict, Any, Optional
 from decimal import Decimal
 import os
-from node import Node
-from storage_volume import StorageVolumeManager
+try:
+    from .node import Node
+    from .storage_volume import StorageVolumeManager
+except ImportError:  # pragma: no cover
+    from node import Node  # type: ignore
+    from storage_volume import StorageVolumeManager  # type: ignore
 
 # Create FastAPI app
 app = FastAPI(

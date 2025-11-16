@@ -1,0 +1,27 @@
+{
+  "port": 8000,
+  "host": "0.0.0.0",
+  "ping_interval": 30,
+  "identity_file": "node_identity.json",
+  "wallet_address": null,
+  "payment_wallet": null,
+  "storage_lending_enabled": false,
+  "storage": {
+    "mount_path": "/",
+    "mapper_name": "moxi-node",
+    "backing_file": "/var/moxi-node/storage-node.img"
+  },
+  "registry": {
+    "contract_address": "",
+    "rpc_url": "",
+    "chain_id": 421614,
+    "auto_register": false,
+    "auto_update_interval": 300,
+    "price_per_gb_eth": "0.001"
+  },
+  "token": {
+    "address": "",
+    "rpc_url": "",
+    "private_key": ""
+  }
+}

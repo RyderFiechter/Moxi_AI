@@ -74,6 +74,50 @@ The node will:
 3. Set `PRIVATE_KEY` environment variable
 4. Run the node: `python main.py`
 
+## Command Line Interface
+
+Install the dependencies and then use the bundled CLI to start the node or mirror every control available on the storage dashboard without opening the dapp:
+
+```bash
+# From the repository root
+cd node
+python -m node.cli --help
+```
+
+Key commands:
+
+- `python -m node.cli run --config config.json` – start the node and HTTP API (same as `python main.py`).
+- `python -m node.cli status` – show live metrics identical to `/storage` in the dapp.
+- `python -m node.cli config set-payment 0xabc...` – update the payment wallet.
+- `python -m node.cli storage enable|disable` – toggle storage lending.
+- `python -m node.cli registry register --storage-gb 100 --price-per-gb 0.001` – register or update offers.
+- `python -m node.cli registry activate|deactivate` – manage registry activity state.
+- `python -m node.cli rewards payout` – send pending MOXI payouts.
+- `python -m node.cli dashboard` – launch an interactive Rich-powered dashboard that mirrors the `/storage` page (live metrics, buttons for every action).
+
+Pass `--api-base http://host:port` (or set `MOXI_NODE_API`) to point the CLI at a remote node.
+
+## Desktop GUI
+
+Prefer a desktop window instead of the terminal? Launch the Tkinter-based UI that mirrors the storage page:
+
+```bash
+cd node
+python -m node.gui --api-base http://localhost:8000 --refresh 5
+```
+
+The window refreshes the same metrics (wallets, storage totals, earnings, registry state) and provides identical buttons: update payment wallet, toggle storage lending, register/update offers, activate/deactivate, refresh storage, and send payouts.  
+The register flow now reuses the node's configured on-chain price—just enter the storage amount and the app handles the rest. The payout button shows the destination wallet and only enables when there is a non-zero pending balance.
+To ship it as a standalone app, use your favorite packager—for example:
+
+```bash
+pip install pyinstaller
+cd node
+pyinstaller --windowed --name MoxiNodeDashboard gui.py
+```
+
+The generated binary under `dist/` can be pinned to your desktop/dock.
+
 ## Configuration
 
 ### Config File (`config.json`)
@@ -90,7 +134,7 @@ The node will:
   "storage": {
     "mount_path": "/mnt/moxi-node",
     "mapper_name": "moxi-node",
-    "backing_file": "/var/moxi/storage-node.img"
+    "backing_file": "/var/moxi-node/storage-node.img"
   },
   "registry": {
     "contract_address": "",
@@ -113,7 +157,7 @@ The node will:
 - **storage_lending_enabled**: Whether storage lending is enabled
 - **storage.mount_path**: Filesystem path the node measures/commits against
 - **storage.mapper_name**: Logical name for the encrypted mapper (documentation only)
-- **storage.backing_file**: Sparse file or block device for the encrypted volume (documentation only)
+- **storage.backing_file**: Sparse file or block device for the encrypted volume (defaults to `/var/moxi-node/storage-node.img`; create the directory via `sudo mkdir -p /var/moxi-node && sudo chown $USER /var/moxi-node`)
 - **registry.contract_address**: StorageRegistry contract address
 - **registry.rpc_url**: Blockchain RPC endpoint
 - **registry.auto_register**: Automatically register on startup
@@ -126,7 +170,7 @@ The node will:
    cd node/scripts
    sudo CONTROLLER_PRIVATE_KEY=0xyourcontrollerkey \
         VOLUME_SIZE_GB=200 \
-        VOLUME_FILE=/var/moxi/storage-node01.img \
+        VOLUME_FILE=/var/moxi-node/storage-node01.img \
         MAPPER_NAME=node01-crypt \
         MOUNT_POINT=/mnt/node01 \
         ./setup_encrypted_volume.sh create
@@ -139,7 +183,7 @@ The node will:
    "storage": {
      "mount_path": "/mnt/node01",
      "mapper_name": "node01-crypt",
-     "backing_file": "/var/moxi/storage-node01.img"
+     "backing_file": "/var/moxi-node/storage-node01.img"
    }
    ```
    The node now reports totals/availables from this filesystem instead of `/`, so the “locked” capacity shows up as an actual mounted volume.

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 MODE=${1:-create}
-VOLUME_FILE=${VOLUME_FILE:-/var/moxi/storage-node.img}
+VOLUME_FILE=${VOLUME_FILE:-/var/moxi-node/storage-node.img}
 VOLUME_SIZE_GB=${VOLUME_SIZE_GB:-100}
 MAPPER_NAME=${MAPPER_NAME:-moxi-node}
 MOUNT_POINT=${MOUNT_POINT:-/mnt/moxi-node}

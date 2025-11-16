@@ -208,8 +208,11 @@ export default function StorageDashboard() {
 
   const refreshNodeData = () =>
     handleAction(async () => {
-      return { message: 'Storage metrics refreshed' };
-    }, 'Storage metrics refreshed');
+      const data = await fetchJson('/registry/update', {
+        method: 'POST',
+      });
+      return data;
+    }, 'Storage updated in registry');
 
   const activateRegistry = () =>
     handleAction(async () => {

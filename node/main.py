@@ -8,17 +8,30 @@ import argparse
 import json
 import os
 import uvicorn
-from node import Node
-from node_api import (
-    app,
-    set_node,
-    set_registry_client,
-    set_storage_volume_manager,
-    set_token_client,
-)
-from storage_volume import StorageVolumeManager
-from blockchain.registry import StorageRegistryClient, WEB3_AVAILABLE
-from blockchain.token import ERC20TokenClient
+try:
+    from .node import Node
+    from .node_api import (
+        app,
+        set_node,
+        set_registry_client,
+        set_storage_volume_manager,
+        set_token_client,
+    )
+    from .storage_volume import StorageVolumeManager
+    from .blockchain.registry import StorageRegistryClient, WEB3_AVAILABLE
+    from .blockchain.token import ERC20TokenClient
+except ImportError:  # pragma: no cover
+    from node import Node  # type: ignore
+    from node_api import (  # type: ignore
+        app,
+        set_node,
+        set_registry_client,
+        set_storage_volume_manager,
+        set_token_client,
+    )
+    from storage_volume import StorageVolumeManager  # type: ignore
+    from blockchain.registry import StorageRegistryClient, WEB3_AVAILABLE  # type: ignore
+    from blockchain.token import ERC20TokenClient  # type: ignore
 
 
 def load_config(config_file: str = "config.json") -> dict:
@@ -34,7 +47,7 @@ def load_config(config_file: str = "config.json") -> dict:
         "storage": {
             "mount_path": "/",
             "mapper_name": "moxi-node",
-            "backing_file": ""
+            "backing_file": "/var/moxi-node/storage-node.img"
         },
         "registry": {
             "contract_address": "",

@@ -7,9 +7,14 @@ import json
 import os
 import asyncio
 from datetime import datetime
+from pathlib import Path
 from typing import Optional, Dict, Any
 import secrets
 import psutil
+try:
+    from .storage_volume import DEFAULT_BACKING_DIR, DEFAULT_BACKING_FILENAME
+except ImportError:  # pragma: no cover
+    from storage_volume import DEFAULT_BACKING_DIR, DEFAULT_BACKING_FILENAME
 
 MOXI_PER_HOUR_PER_10_GB = 1.0  # Base accrual rate
 MOXI_PER_SECOND_PER_10_GB = MOXI_PER_HOUR_PER_10_GB / 3600.0
@@ -26,7 +31,7 @@ class Node:
         identity_file: str = "node_identity.json",
         ping_interval: int = 30,
         storage_lending_enabled: bool = False,
-        storage_mount_path: str = "/",
+        storage_mount_path: Optional[str] = None,
         storage_backing_file: Optional[str] = None,
         storage_mapper_name: Optional[str] = None
     ):
@@ -48,6 +53,9 @@ class Node:
         self.is_running = False
         self._ping_task: Optional[asyncio.Task] = None
         self.storage_lending_enabled = storage_lending_enabled
+        self._storage_mount_path_provided = storage_mount_path is not None
+        self._storage_backing_file_provided = storage_backing_file is not None
+        self._storage_mapper_provided = storage_mapper_name is not None
         self.storage_mount_path = storage_mount_path or "/"
         self.storage_backing_file = storage_backing_file
         self.storage_mapper_name = storage_mapper_name
@@ -74,9 +82,22 @@ class Node:
         if self.last_earnings_update is None:
             self.last_earnings_update = datetime.now()
         
+        self._ensure_storage_defaults()
+
         # Save identity
         self._save_identity()
     
+    def _ensure_storage_defaults(self) -> None:
+        """Fill in default storage values when absent."""
+        if not self.storage_backing_file:
+            if os.name != "nt":
+                default_path = (DEFAULT_BACKING_DIR / DEFAULT_BACKING_FILENAME).expanduser()
+            else:
+                default_path = Path(self.storage_mount_path).expanduser() / ".moxi_encrypted.bin"
+            self.storage_backing_file = str(default_path)
+        if not self.storage_mapper_name:
+            self.storage_mapper_name = "moxi-node"
+
     def _generate_wallet_address(self) -> str:
         """Generate a random wallet address (hex string)."""
         return "0x" + secrets.token_hex(20)
@@ -95,11 +116,23 @@ class Node:
                             self.payment_wallet = data['payment_wallet']
                         if 'storage_lending_enabled' in data:
                             self.storage_lending_enabled = data['storage_lending_enabled']
-                        if 'storage_mount_path' in data and data['storage_mount_path']:
+                        if (
+                            not self._storage_mount_path_provided
+                            and 'storage_mount_path' in data
+                            and data['storage_mount_path']
+                        ):
                             self.storage_mount_path = data['storage_mount_path']
-                        if 'storage_backing_file' in data and data['storage_backing_file']:
+                        if (
+                            not self._storage_backing_file_provided
+                            and 'storage_backing_file' in data
+                            and data['storage_backing_file']
+                        ):
                             self.storage_backing_file = data['storage_backing_file']
-                        if 'storage_mapper_name' in data and data['storage_mapper_name']:
+                        if (
+                            not self._storage_mapper_provided
+                            and 'storage_mapper_name' in data
+                            and data['storage_mapper_name']
+                        ):
                             self.storage_mapper_name = data['storage_mapper_name']
                         if 'committed_storage_gb' in data:
                             self.committed_storage_gb = float(data['committed_storage_gb'])
@@ -452,4 +485,3 @@ class Node:
         # 3. Returning verification result
         print(f"🔍 [{self.wallet_address[:10]}...] Proof of storage check for chunk {file_chunk_id[:8]}... (stub)")
         return True
-

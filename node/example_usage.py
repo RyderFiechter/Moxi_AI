@@ -4,8 +4,12 @@ This demonstrates the API for future integration.
 """
 
 import asyncio
-from node import Node
-from network import Network
+try:
+    from .node import Node
+    from .network import Network
+except ImportError:  # pragma: no cover
+    from node import Node  # type: ignore
+    from network import Network  # type: ignore
 
 
 async def example_single_node():
